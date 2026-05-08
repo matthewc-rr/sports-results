@@ -1296,7 +1296,8 @@ function buildGameCard(event, leagueId, lg) {
   aStar.addEventListener('click',e=>{e.stopPropagation();toggleFav(at.id,{name:at.displayName,abbrev:at.abbreviation,logo:at.logo});});
   awayWrap.appendChild(aStar); awayDiv.appendChild(awayWrap);
   const aInfo=document.createElement('div');
-  aInfo.innerHTML=`<div class="team-name">${at.displayName||'TBD'}</div>${ac.records?.[0]?.summary?`<div class="team-record">${ac.records[0].summary}</div>`:''}`;
+  const aAts = atsStore[at.id]; const aAtsTxt = aAts && (aAts.w+aAts.l+aAts.p)>0 ? ` · ${aAts.w}-${aAts.l}${aAts.p?`-${aAts.p}`:''} ATS` : '';
+  aInfo.innerHTML=`<div class="team-name">${at.displayName||'TBD'}</div>${ac.records?.[0]?.summary?`<div class="team-record">${ac.records[0].summary}${aAtsTxt}</div>`:''}`;
   awayDiv.appendChild(aInfo);
 
   // Score block
@@ -1336,7 +1337,8 @@ function buildGameCard(event, leagueId, lg) {
   hStar.addEventListener('click',e=>{e.stopPropagation();toggleFav(ht.id,{name:ht.displayName,abbrev:ht.abbreviation,logo:ht.logo});});
   homeWrap.appendChild(hStar); homeDiv.appendChild(homeWrap);
   const hInfo=document.createElement('div');
-  hInfo.innerHTML=`<div class="team-name">${ht.displayName||'TBD'}</div>${hc.records?.[0]?.summary?`<div class="team-record">${hc.records[0].summary}</div>`:''}`;
+  const hAts = atsStore[ht.id]; const hAtsTxt = hAts && (hAts.w+hAts.l+hAts.p)>0 ? ` · ${hAts.w}-${hAts.l}${hAts.p?`-${hAts.p}`:''} ATS` : '';
+  hInfo.innerHTML=`<div class="team-name">${ht.displayName||'TBD'}</div>${hc.records?.[0]?.summary?`<div class="team-record">${hc.records[0].summary}${hAtsTxt}</div>`:''}`;
   homeDiv.appendChild(hInfo);
 
   body.appendChild(awayDiv); body.appendChild(sb); body.appendChild(homeDiv);
