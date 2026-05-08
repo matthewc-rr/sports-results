@@ -23,7 +23,7 @@
     .date-nav button:disabled { opacity: .3; cursor: not-allowed; }
     .date-display { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 4px 12px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; position: relative; user-select: none; }
     .date-display:hover { background: var(--border); }
-    #date-picker { position: absolute; opacity: 0; width: 100%; height: 100%; top: 0; left: 0; cursor: pointer; }
+    #date-picker { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
     .header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
     .icon-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 15px; display: flex; align-items: center; justify-content: center; }
     .icon-btn:hover { background: var(--border); }
@@ -652,6 +652,10 @@ function updateDateUI() {
 document.getElementById('prev-day').addEventListener('click', () => { currentDate.setDate(currentDate.getDate()-1); cache={}; updateDateUI(); loadGames(); });
 document.getElementById('next-day').addEventListener('click', () => { const t=new Date();t.setHours(0,0,0,0); if(currentDate<t){currentDate.setDate(currentDate.getDate()+1);cache={};updateDateUI();loadGames();} });
 document.getElementById('today-btn').addEventListener('click', () => { currentDate=new Date();currentDate.setHours(0,0,0,0);cache={};updateDateUI();loadGames(); });
+document.querySelector('.date-display').addEventListener('click', () => {
+  const picker = document.getElementById('date-picker');
+  try { picker.showPicker(); } catch { picker.click(); }
+});
 document.getElementById('date-picker').addEventListener('change', e => { const [y,m,d]=e.target.value.split('-').map(Number); currentDate=new Date(y,m-1,d); cache={}; updateDateUI(); loadGames(); });
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
