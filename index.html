@@ -102,7 +102,7 @@
     .odds-val.fav { color: #e05c3b; }
     .odds-val.dog { color: #4f8ef7; }
     .odds-div { color: var(--border); margin: 0 10px; }
-    .odds-implied { font-size: 10px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+    .odds-implied { font-size: 11px; color: #a0a8c0; font-weight: 600; margin-left: 3px; }
     .odds-move { font-size: 10px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
     .odds-move.move-up { color: #4caf50; }
     .odds-move.move-dn { color: #e05c3b; }
@@ -859,10 +859,10 @@ function buildOddsStrip(comp, isFinal) {
 
     let mlHtml = `<span class="odds-key">ML</span> `;
     mlHtml += `<span class="odds-val ${aFav ? 'fav' : 'dog'}">${formatML(displayAway)}</span>`;
-    if (aImplied) mlHtml += `<span class="odds-implied">${aImplied}%</span>`;
+    if (aImplied) mlHtml += `<span class="odds-implied">(${aImplied}%)</span>`;
     mlHtml += `<span class="odds-div"> / </span>`;
     mlHtml += `<span class="odds-val ${hFav ? 'fav' : 'dog'}">${formatML(displayHome)}</span>`;
-    if (hImplied) mlHtml += `<span class="odds-implied">${hImplied}%</span>`;
+    if (hImplied) mlHtml += `<span class="odds-implied">(${hImplied}%)</span>`;
     items.push({ html: mlHtml });
   }
 
