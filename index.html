@@ -13,6 +13,12 @@
     }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
 
+    /* Responsible gambling banner */
+    .rg-banner { background: #1a1a2e; border-bottom: 1px solid #2a2a4a; padding: 8px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #a0a8c0; line-height: 1.5; }
+    .rg-banner strong { color: #f59e0b; font-size: 11px; white-space: nowrap; }
+    .rg-banner a { color: #818cf8; text-decoration: none; }
+    .rg-banner a:hover { text-decoration: underline; }
+
     /* Header */
     header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 200; }
     .logo { font-size: 18px; font-weight: 700; letter-spacing: -.5px; flex-shrink: 0; }
@@ -337,6 +343,11 @@
   </style>
 </head>
 <body>
+
+<div class="rg-banner">
+  <strong>⚠️ Gambling can be harmful.</strong>
+  <span>If you or someone you know is struggling, free confidential support is available 24/7 — call <strong>1-866-531-2600</strong>, text <strong>247247</strong>, or chat at <a href="https://www.connexontario.ca" target="_blank" rel="noopener noreferrer">connexontario.ca</a>.</span>
+</div>
 
 <div class="ad-overlay" id="ad-overlay">
   <div class="ad-sponsored">Featured Sportsbook</div>
