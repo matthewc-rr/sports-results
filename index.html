@@ -130,6 +130,8 @@
     .recap-stat { font-size: 12px; color: #a0a8c0; padding-top: 3px; line-height: 1.4; }
     .recap-game-emoji { font-size: 15px; flex-shrink: 0; }
     .ou-rec-ph:empty { display: none; }
+    .ats-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
+    .ats-rec-ph:empty { display: none; }
 
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
@@ -485,7 +487,8 @@ let activeSoccerLeague = 'all'; // 'all' | soccer league id
 let cache = {};
 let teamListCache = {}; // { leagueId: [{ id, displayName, abbrev, logo, leagueId }] }
 
-let ouCache = {}; // { 'sport/league/teamId': { over, under, push } | null }
+let ouCache  = {}; // { 'sport/league/teamId': { over, under, push } | null }
+let atsRecordCache = {}; // { 'sport/league/teamId': { w, l, p } | null }
 
 let favorites = JSON.parse(localStorage.getItem('sports-favs') || '{}');
 let atsStore  = JSON.parse(localStorage.getItem('sports-ats')  || '{}');
@@ -845,6 +848,51 @@ async function loadOURecords(strip, awayTeam, homeTeam, lg) {
   if (parts.length) ph.textContent = parts.join(' · ');
 }
 
+async function fetchTeamATSRecord(teamId, sport, league) {
+  const key = `${sport}/${league}/${teamId}`;
+  if (key in atsRecordCache) return atsRecordCache[key];
+  try {
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${teamId}/schedule`);
+    if (!r.ok) { atsRecordCache[key] = null; return null; }
+    const data = await r.json();
+    let w = 0, l = 0, p = 0;
+    for (const ev of data.events || []) {
+      if (ev.status?.type?.state !== 'post') continue;
+      const comp = ev.competitions?.[0]; if (!comp) continue;
+      const odds = comp.odds?.[0] || comp.pickcenter?.[0];
+      const spreadMag = Math.abs(parseFloat(odds?.spread));
+      if (isNaN(spreadMag) || spreadMag === 0) continue;
+      const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
+      const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
+      if (!homeComp || !awayComp) continue;
+      const homeScore = parseInt(homeComp.score), awayScore = parseInt(awayComp.score);
+      if (isNaN(homeScore) || isNaN(awayScore)) continue;
+      const isHomeFav = odds.homeTeamOdds?.favorite === true;
+      const queriedIsHome = String(homeComp.id) === String(teamId) || String(homeComp.team?.id) === String(teamId);
+      const teamSpread = queriedIsHome ? (isHomeFav ? -spreadMag : spreadMag) : (isHomeFav ? spreadMag : -spreadMag);
+      const teamScore = queriedIsHome ? homeScore : awayScore;
+      const oppScore  = queriedIsHome ? awayScore  : homeScore;
+      const adj = teamScore + teamSpread;
+      if (adj > oppScore) w++; else if (adj < oppScore) l++; else p++;
+    }
+    atsRecordCache[key] = { w, l, p };
+    return atsRecordCache[key];
+  } catch { atsRecordCache[key] = null; return null; }
+}
+
+async function loadATSRecords(strip, awayTeam, homeTeam, lg) {
+  const ph = strip.querySelector('.ats-rec-ph');
+  if (!ph || !awayTeam?.id || !homeTeam?.id) return;
+  const [ar, hr] = await Promise.all([
+    fetchTeamATSRecord(awayTeam.id, lg.sport, lg.league),
+    fetchTeamATSRecord(homeTeam.id, lg.sport, lg.league),
+  ]);
+  const parts = [];
+  if (ar && (ar.w + ar.l) > 0) parts.push(`${awayTeam.abbreviation||''} ${ar.w}-${ar.l}${ar.p?`-${ar.p}`:''} ATS`);
+  if (hr && (hr.w + hr.l) > 0) parts.push(`${homeTeam.abbreviation||''} ${hr.w}-${hr.l}${hr.p?`-${hr.p}`:''} ATS`);
+  if (parts.length) ph.textContent = parts.join(' · ');
+}
+
 // ── Recap / Summary tab ───────────────────────────────────────────────────────
 function extractNotableStats(summary, sport) {
   const results = [];
@@ -1130,7 +1178,8 @@ function buildOddsStrip(comp, isFinal) {
       const cls = closeSpread < openSpread ? 'move-dn' : 'move-up';
       moveHtml = ` <span class="odds-move ${cls}">${dir}${openStr}</span>`;
     }
-    items.push({ html: `<span class="odds-key">Spread</span> <span class="odds-val">${spreadVal}</span>${moveHtml}` });
+    const atsPh = (!isFinal && !TENNIS_IDS.has(comp?._leagueId)) ? ' <span class="ats-rec-ph"></span>' : '';
+    items.push({ html: `<span class="odds-key">Spread</span> <span class="odds-val">${spreadVal}</span>${moveHtml}${atsPh}` });
   }
 
   // O/U + line movement + team O/U record placeholders
@@ -1297,7 +1346,7 @@ function buildGameCard(event, leagueId, lg) {
   const odds = buildOddsStrip(comp, isFinal);
   if (odds) {
     card.appendChild(odds);
-    if (isPre && lg && !TENNIS_IDS.has(leagueId)) loadOURecords(odds, at, ht, lg);
+    if (isPre && lg && !TENNIS_IDS.has(leagueId)) { loadOURecords(odds, at, ht, lg); loadATSRecords(odds, at, ht, lg); }
   }
 
   // Linescore
