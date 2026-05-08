@@ -132,6 +132,8 @@
     .ou-rec-ph:empty { display: none; }
     .ats-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
     .ats-rec-ph:empty { display: none; }
+    .ats-wl-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; }
+    .ats-wl-ph:empty { display: none; }
 
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
@@ -857,23 +859,9 @@ async function fetchTeamATSRecord(teamId, sport, league) {
     const data = await r.json();
     let w = 0, l = 0, p = 0;
     for (const ev of data.events || []) {
-      if (ev.status?.type?.state !== 'post') continue;
-      const comp = ev.competitions?.[0]; if (!comp) continue;
-      const odds = comp.odds?.[0] || comp.pickcenter?.[0];
-      const spreadMag = Math.abs(parseFloat(odds?.spread));
-      if (isNaN(spreadMag) || spreadMag === 0) continue;
-      const homeComp = comp.competitors?.find(c => c.homeAway === 'home');
-      const awayComp = comp.competitors?.find(c => c.homeAway === 'away');
-      if (!homeComp || !awayComp) continue;
-      const homeScore = parseInt(homeComp.score), awayScore = parseInt(awayComp.score);
-      if (isNaN(homeScore) || isNaN(awayScore)) continue;
-      const isHomeFav = odds.homeTeamOdds?.favorite === true;
-      const queriedIsHome = String(homeComp.id) === String(teamId) || String(homeComp.team?.id) === String(teamId);
-      const teamSpread = queriedIsHome ? (isHomeFav ? -spreadMag : spreadMag) : (isHomeFav ? spreadMag : -spreadMag);
-      const teamScore = queriedIsHome ? homeScore : awayScore;
-      const oppScore  = queriedIsHome ? awayScore  : homeScore;
-      const adj = teamScore + teamSpread;
-      if (adj > oppScore) w++; else if (adj < oppScore) l++; else p++;
+      const result = computeATS(ev, teamId);
+      if (!result) continue;
+      if (result === 'W') w++; else if (result === 'L') l++; else p++;
     }
     atsRecordCache[key] = { w, l, p };
     return atsRecordCache[key];
@@ -1296,8 +1284,7 @@ function buildGameCard(event, leagueId, lg) {
   aStar.addEventListener('click',e=>{e.stopPropagation();toggleFav(at.id,{name:at.displayName,abbrev:at.abbreviation,logo:at.logo});});
   awayWrap.appendChild(aStar); awayDiv.appendChild(awayWrap);
   const aInfo=document.createElement('div');
-  const aAts = atsStore[at.id]; const aAtsTxt = aAts && (aAts.w+aAts.l+aAts.p)>0 ? ` · ${aAts.w}-${aAts.l}${aAts.p?`-${aAts.p}`:''} ATS` : '';
-  aInfo.innerHTML=`<div class="team-name">${at.displayName||'TBD'}</div>${ac.records?.[0]?.summary?`<div class="team-record">${ac.records[0].summary}${aAtsTxt}</div>`:''}`;
+  aInfo.innerHTML=`<div class="team-name">${at.displayName||'TBD'}</div>${ac.records?.[0]?.summary?`<div class="team-record">${ac.records[0].summary}<span class="ats-wl-ph"></span></div>`:''}`;
   awayDiv.appendChild(aInfo);
 
   // Score block
@@ -1337,8 +1324,7 @@ function buildGameCard(event, leagueId, lg) {
   hStar.addEventListener('click',e=>{e.stopPropagation();toggleFav(ht.id,{name:ht.displayName,abbrev:ht.abbreviation,logo:ht.logo});});
   homeWrap.appendChild(hStar); homeDiv.appendChild(homeWrap);
   const hInfo=document.createElement('div');
-  const hAts = atsStore[ht.id]; const hAtsTxt = hAts && (hAts.w+hAts.l+hAts.p)>0 ? ` · ${hAts.w}-${hAts.l}${hAts.p?`-${hAts.p}`:''} ATS` : '';
-  hInfo.innerHTML=`<div class="team-name">${ht.displayName||'TBD'}</div>${hc.records?.[0]?.summary?`<div class="team-record">${hc.records[0].summary}${hAtsTxt}</div>`:''}`;
+  hInfo.innerHTML=`<div class="team-name">${ht.displayName||'TBD'}</div>${hc.records?.[0]?.summary?`<div class="team-record">${hc.records[0].summary}<span class="ats-wl-ph"></span></div>`:''}`;
   homeDiv.appendChild(hInfo);
 
   body.appendChild(awayDiv); body.appendChild(sb); body.appendChild(homeDiv);
@@ -1349,6 +1335,15 @@ function buildGameCard(event, leagueId, lg) {
   if (odds) {
     card.appendChild(odds);
     if (lg && !TENNIS_IDS.has(leagueId)) { if (isPre) loadOURecords(odds, at, ht, lg); loadATSRecords(odds, at, ht, lg); }
+  }
+
+  // ATS season records on W-L line (all teams, fire-and-forget)
+  if (lg && !TENNIS_IDS.has(leagueId) && at.id && ht.id) {
+    const aWlPh = aInfo.querySelector('.ats-wl-ph');
+    const hWlPh = hInfo.querySelector('.ats-wl-ph');
+    const fmt = r => r && (r.w+r.l+r.p)>0 ? ` · ${r.w}-${r.l}${r.p?`-${r.p}`:''} ATS` : '';
+    if (aWlPh) fetchTeamATSRecord(at.id, lg.sport, lg.league).then(r => { const t=fmt(r); if(t) aWlPh.textContent=t; });
+    if (hWlPh) fetchTeamATSRecord(ht.id, lg.sport, lg.league).then(r => { const t=fmt(r); if(t) hWlPh.textContent=t; });
   }
 
   // Linescore
