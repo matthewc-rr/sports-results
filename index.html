@@ -449,7 +449,7 @@ const STD_COLS = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentDate = new Date(); currentDate.setHours(0,0,0,0); currentDate.setDate(currentDate.getDate()-1);
+let currentDate = new Date(); currentDate.setHours(0,0,0,0);
 let activeTab = 'hot';
 let activeSubView = 'scores'; // 'scores' | 'standings'
 let activeSoccerLeague = 'all'; // 'all' | soccer league id
@@ -604,7 +604,7 @@ function buildTabs() {
       if (n) inner += `<span class="tab-count">${n}</span>`;
     }
     btn.innerHTML = inner;
-    btn.addEventListener('click', () => { activeTab=lg.id; activeSubView='scores'; if (lg.id !== 'soccer') activeSoccerLeague='all'; buildTabs(); updateSubNav(); loadGames(); });
+    btn.addEventListener('click', () => { activeTab=lg.id; activeSubView='scores'; if (lg.id !== 'soccer') activeSoccerLeague='all'; if (lg.id === 'hot') { currentDate=new Date(); currentDate.setHours(0,0,0,0); cache={}; updateDateUI(); } buildTabs(); updateSubNav(); loadGames(); });
     wrap.appendChild(btn);
   });
 }
