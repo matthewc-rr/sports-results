@@ -1029,21 +1029,58 @@ function buildATSSummary() {
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
-let allTeams = []; // flat list loaded once
+let allTeams = [];
+let searchLoaded = false;
+
+async function loadAllTeamsForSearch() {
+  const leagues = allLeagues();
+  const results = await Promise.allSettled(leagues.map(async lg => {
+    try {
+      if (TENNIS_IDS.has(lg.id)) {
+        const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/rankings`);
+        if (!r.ok) return [];
+        const data = await r.json();
+        return (data.rankings?.[0]?.ranks || []).map(rank => ({
+          id: rank.athlete?.id,
+          displayName: rank.athlete?.displayName || '?',
+          abbrev: rank.athlete?.shortname || '',
+          shortDisplayName: rank.athlete?.shortname || '',
+          nickname: '',
+          location: rank.athlete?.flag?.alt || '',
+          logo: rank.athlete?.flag?.href || null,
+          leagueId: lg.id,
+          rank: rank.current,
+        })).filter(p => p.id);
+      } else {
+        const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/teams?limit=100`);
+        if (!r.ok) return [];
+        const data = await r.json();
+        return (data.sports?.[0]?.leagues?.[0]?.teams || []).map(t => ({
+          id: t.team.id,
+          displayName: t.team.displayName,
+          abbrev: t.team.abbreviation,
+          shortDisplayName: t.team.shortDisplayName || '',
+          nickname: t.team.nickname || '',
+          location: t.team.location || '',
+          logo: t.team.logos?.[0]?.href || t.team.logo,
+          leagueId: lg.id,
+        }));
+      }
+    } catch { return []; }
+  }));
+  return leagues.flatMap((_, i) => results[i].status === 'fulfilled' ? results[i].value : []);
+}
 
 async function openSearch() {
   document.getElementById('search-overlay').classList.add('open');
   document.getElementById('search-input').focus();
 
-  // Only fetch leagues not yet in cache; each league is fetched at most once
-  const uncached = allLeagues().filter(lg => !(lg.id in teamListCache));
-  if (uncached.length > 0) {
+  if (!searchLoaded) {
     document.getElementById('search-body').innerHTML = '<div class="state-box" style="padding:30px"><div class="spinner"></div><p>Loading…</p></div>';
-    await Promise.allSettled(uncached.map(fetchTeams));
+    allTeams = await loadAllTeamsForSearch();
+    searchLoaded = true;
   }
 
-  // Always rebuild from cache so partial earlier loads get completed
-  allTeams = allLeagues().flatMap(lg => teamListCache[lg.id] || []);
   filterSearch(document.getElementById('search-input').value);
 }
 
