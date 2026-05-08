@@ -150,6 +150,18 @@
     .pitcher-vs   { font-size: 11px; color: var(--muted); font-weight: 600; flex-shrink: 0; }
     .pitcher-lbl  { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
+    /* Glossary */
+    .glossary-wrap { padding: 20px; max-width: 740px; margin: 0 auto; }
+    .glossary-hdr { margin-bottom: 20px; }
+    .glossary-title { font-size: 20px; font-weight: 700; }
+    .glossary-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .glossary-section { margin-bottom: 22px; }
+    .glossary-section-hdr { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #60a5fa; margin-bottom: 10px; }
+    .glossary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 13px 16px; margin-bottom: 8px; }
+    .glossary-term { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 5px; }
+    .glossary-def { font-size: 13px; color: #c8cfe0; line-height: 1.55; }
+    .glossary-example { font-size: 12px; color: var(--muted); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); font-style: italic; line-height: 1.5; }
+
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
     .linescore table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 260px; }
@@ -441,10 +453,11 @@ const SOCCER_LEAGUES = [
 ];
 const SOCCER_TAB = { id:'soccer', label:'⚽ Soccer', color:'#4caf50' };
 function allLeagues() { return [...LEAGUES, ...SOCCER_LEAGUES]; }
-const FAVS_TAB  = { id:'favs',  label:'★ Favs',    color:'#f5c842' };
-const HOT_TAB   = { id:'hot',   label:'🔥 Top Games', color:'#ff6b35' };
-const BOOKS_TAB = { id:'books', label:'Sportsbooks', color:'#22c55e' };
-const SUMMARY_TAB = { id:'recap', label:'📋 Recap', color:'#a78bfa' };
+const FAVS_TAB     = { id:'favs',     label:'★ Favs',      color:'#f5c842' };
+const HOT_TAB      = { id:'hot',      label:'🔥 Top Games', color:'#ff6b35' };
+const BOOKS_TAB    = { id:'books',    label:'Sportsbooks',  color:'#22c55e' };
+const SUMMARY_TAB  = { id:'recap',    label:'📋 Recap',     color:'#a78bfa' };
+const GLOSSARY_TAB = { id:'glossary', label:'📖 Glossary',  color:'#60a5fa' };
 
 const SPORTSBOOKS = [
   { name:'Bally Bet',          url:'https://play.ballybet.ca' },
@@ -663,7 +676,7 @@ function shortDate(s) { return new Date(s).toLocaleDateString('en-US',{month:'sh
 function buildTabs() {
   const wrap = document.getElementById('tabs');
   wrap.innerHTML = '';
-  const all = [HOT_TAB, SUMMARY_TAB, FAVS_TAB, ...LEAGUES.slice(0,6), SOCCER_TAB, ...LEAGUES.slice(6), BOOKS_TAB];
+  const all = [HOT_TAB, SUMMARY_TAB, FAVS_TAB, ...LEAGUES.slice(0,6), SOCCER_TAB, ...LEAGUES.slice(6), BOOKS_TAB, GLOSSARY_TAB];
   all.forEach(lg => {
     const btn = document.createElement('button');
     btn.className = 'tab' + (lg.id===activeTab?' active':'');
@@ -698,7 +711,7 @@ function updateSubNav() {
   }
 
   const activeLg = allLeagues().find(l => l.id === activeTab);
-  if (activeTab==='recap' || activeTab==='favs' || activeTab==='books' || activeTab==='hot' || activeLg?.noStandings) { wrap.style.display='none'; return; }
+  if (activeTab==='recap' || activeTab==='favs' || activeTab==='books' || activeTab==='hot' || activeTab==='glossary' || activeLg?.noStandings) { wrap.style.display='none'; return; }
   wrap.style.display='block';
   nav.innerHTML = '';
   ['scores','standings'].forEach(v => {
@@ -1886,7 +1899,8 @@ async function loadGames() {
   if (activeTab==='soccer') return loadSoccer();
   if (activeTab==='favs')   return loadFavorites();
   if (activeTab==='books')  return loadBooks();
-  if (activeTab==='recap')  return loadSummary();
+  if (activeTab==='recap')    return loadSummary();
+  if (activeTab==='glossary') return loadGlossary();
   if (activeSubView==='standings') return loadStandings(activeTab);
   return loadLeague(activeTab);
 }
@@ -2224,6 +2238,77 @@ function dismissAd() {
   const overlay = document.getElementById('ad-overlay');
   overlay.classList.add('fade-out');
   setTimeout(() => overlay.remove(), 500);
+}
+
+// ── Glossary tab ──────────────────────────────────────────────────────────────
+const GLOSSARY = [
+  {
+    section: 'The Basics',
+    terms: [
+      { term: 'Moneyline (ML)', def: 'A straight-up bet on which team wins. No spread involved. Odds are shown in American format: negative numbers mean that team is the favorite (you risk more to win less), positive numbers mean underdog (risk less to win more).', example: 'Rangers -150 means you bet $150 to win $100. Blue Jays +130 means you bet $100 to win $130.' },
+      { term: 'Point Spread', def: 'A handicap applied to the favorite to level the playing field. The favorite must win by more than the spread to "cover." The underdog covers if they win outright or lose by less than the spread.', example: 'Chiefs -6.5 must win by 7+ to cover. Eagles +6.5 cover if they win or lose by 6 or fewer.' },
+      { term: 'Over/Under (O/U)', def: 'A bet on the combined total score of both teams. You bet whether the final total will be over or under the line set by the sportsbook.', example: 'O/U 221.5 in an NBA game — if the final score is 115–110 = 225 total, the Over wins.' },
+      { term: 'Juice / Vig', def: 'The sportsbook\'s cut. Standard juice is -110, meaning you bet $110 to win $100. The book profits from the difference between both sides.', example: 'Both sides at -110 means the book keeps ~4.5% of every dollar wagered regardless of outcome.' },
+    ]
+  },
+  {
+    section: 'Betting Records',
+    terms: [
+      { term: 'ATS (Against the Spread)', def: 'A team\'s win-loss record when accounting for the point spread. A team can be 40–30 straight up but only 28–42 ATS if they consistently underperform the spread.', example: 'Raptors 24–21 ATS means they\'ve covered the spread 24 times and failed to cover 21 times this season.' },
+      { term: 'O/U Record', def: 'How often a team\'s games go Over or Under the total. Useful for identifying teams that consistently play high- or low-scoring games.', example: 'TOR 28–19 o/u means 28 of their games went Over and 19 went Under the total.' },
+      { term: 'Closing Line Value (CLV)', def: 'If you bet a team at -110 and the line closed at -130, you have positive CLV — you got a better number than the market settled on. Sharp bettors consistently beat the closing line.', example: 'Betting the Leafs at +105 before the line moves to -115 by game time = strong positive CLV.' },
+    ]
+  },
+  {
+    section: 'Line Movement',
+    terms: [
+      { term: 'Steam', def: 'Rapid, significant line movement driven by sharp (professional) money coming in on one side. When multiple sharp groups bet the same side at the same time, books scramble to move the number.', example: 'Rangers open -110, move to -140 quickly without major news = steam. Sharp money is on the Rangers.' },
+      { term: 'Reverse Line Movement (RLM)', def: 'When the public is heavily on one side (e.g. 70% of bets on the favorite) but the line moves toward the underdog. This signals sharp money on the underdog despite public opposition.', example: '72% of tickets on the Lakers, but the line moves from Lakers -5 to -4 = sharp money on the Suns.' },
+      { term: 'Opening Line', def: 'The first odds posted by a sportsbook for a game. Sharp bettors target opening lines before the public pushes them. Comparing open to current shows where the money has gone.', example: 'If the Jays opened +120 and are now +105, bettors have pushed money onto the Jays side.' },
+      { term: 'Line Shopping', def: 'Checking multiple sportsbooks to find the best available number. Even a half-point difference on a spread or 10 cents on a moneyline adds up significantly over a season.', example: 'FanDuel has the Celtics at -6.5 while DraftKings has -6. The extra half-point is worth taking.' },
+    ]
+  },
+  {
+    section: 'Odds & Probability',
+    terms: [
+      { term: 'Implied Probability', def: 'The probability of an outcome implied by the odds, including the sportsbook\'s vig. Calculated from the moneyline to show what win % the odds assume.', example: '-150 implies a 60% win probability. +130 implies ~43.5%. Both sides together exceed 100% — the difference is the vig.' },
+      { term: 'American Odds', def: 'The standard odds format in North America. Negative = favorite, positive = underdog. The number represents how much you win or must risk per $100.', example: '-200 means risk $200 to win $100. +175 means risk $100 to win $175.' },
+      { term: 'Puck Line / Run Line', def: 'The hockey or baseball equivalent of a point spread. Almost always set at ±1.5. The favorite gives 1.5 goals/runs; the underdog gets 1.5.', example: 'Oilers -1.5 means they must win by 2+. Sens +1.5 cover if they win or lose by exactly 1.' },
+      { term: 'Futures', def: 'A bet placed on an outcome that won\'t be decided until weeks or months later, like a championship winner, division winner, or player award.', example: 'Betting the Blue Jays to win the World Series in March at +1200 ($100 wins $1,200).' },
+    ]
+  },
+  {
+    section: 'Betting Strategy',
+    terms: [
+      { term: 'Sharp Money', def: 'Bets placed by professional or high-volume bettors whose action moves lines. Sportsbooks track and respect sharp action, often moving numbers immediately.', example: 'If a book gets $50K on one side from a known sharp bettor, they\'ll move the line before taking more exposure.' },
+      { term: 'Public Money', def: 'Bets placed by casual recreational bettors. The public tends to favor popular teams, home favorites, and overs. Fading the public (betting the other side) is a common strategy.', example: 'In a Cowboys game, 80% of bets are on Dallas. A contrarian bet takes the other side expecting the book to shade the number.' },
+      { term: 'Fade', def: 'To bet against a team or trend. "Fading the public" means betting opposite to where most casual money is going.', example: 'If 75% of bets are on the Maple Leafs, fading means betting their opponent.' },
+      { term: 'Unit', def: 'A standardized bet size used to track performance without revealing dollar amounts. Typically 1–2% of your total bankroll. Tracking units won/lost is standard for comparing bettors.', example: 'If your bankroll is $1,000 and 1 unit = $20, a 5-unit bet = $100.' },
+    ]
+  },
+];
+
+function loadGlossary() {
+  const main = document.getElementById('main');
+  main.innerHTML = '';
+  const wrap = document.createElement('div'); wrap.className = 'glossary-wrap';
+  const hdr = document.createElement('div'); hdr.className = 'glossary-hdr';
+  hdr.innerHTML = `<div class="glossary-title">📖 Betting Glossary</div><div class="glossary-sub">Key terms for reading odds and understanding line movement</div>`;
+  wrap.appendChild(hdr);
+
+  for (const { section, terms } of GLOSSARY) {
+    const sec = document.createElement('div'); sec.className = 'glossary-section';
+    const secHdr = document.createElement('div'); secHdr.className = 'glossary-section-hdr';
+    secHdr.textContent = section;
+    sec.appendChild(secHdr);
+    for (const { term, def, example } of terms) {
+      const card = document.createElement('div'); card.className = 'glossary-card';
+      card.innerHTML = `<div class="glossary-term">${term}</div><div class="glossary-def">${def}</div>${example ? `<div class="glossary-example">e.g. ${example}</div>` : ''}`;
+      sec.appendChild(card);
+    }
+    wrap.appendChild(sec);
+  }
+  main.appendChild(wrap);
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
