@@ -641,7 +641,7 @@ function buildTabs() {
       if (n) inner += `<span class="tab-count">${n}</span>`;
     }
     btn.innerHTML = inner;
-    btn.addEventListener('click', () => { activeTab=lg.id; activeSubView='scores'; if (lg.id !== 'soccer') activeSoccerLeague='all'; if (lg.id === 'hot') { currentDate=new Date(); currentDate.setHours(0,0,0,0); cache={}; updateDateUI(); } buildTabs(); updateSubNav(); loadGames(); });
+    btn.addEventListener('click', () => { activeTab=lg.id; activeSubView='scores'; if (lg.id !== 'soccer') activeSoccerLeague='all'; if (lg.id === 'hot') { currentDate=new Date(); currentDate.setHours(0,0,0,0); cache={}; updateDateUI(); } else if (lg.id === 'recap') { const y=new Date(); y.setHours(0,0,0,0); y.setDate(y.getDate()-1); currentDate=y; cache={}; updateDateUI(); } buildTabs(); updateSubNav(); loadGames(); });
     wrap.appendChild(btn);
   });
 }
