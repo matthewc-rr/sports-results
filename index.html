@@ -1204,9 +1204,16 @@ function buildOddsStrip(comp, isFinal) {
     items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}${recPh}` });
   }
 
-  // ML: scan ALL entries for best available moneyline (primary entry may lack ML for pre-game)
-  const awayMLs = allEntries.map(l => l.awayTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
-  const homeMLs = allEntries.map(l => l.homeTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+  // ML: scan ALL entries — old pickcenter format uses awayTeamOdds.moneyLine (number),
+  // new odds format uses moneyline.away.close.odds (string like "+113" or "-136")
+  const readML = (entry, side) => {
+    const old = entry?.[side + 'TeamOdds']?.moneyLine;
+    if (old != null && old !== 0) return old;
+    const n = parseInt(entry?.moneyline?.[side]?.close?.odds);
+    return isNaN(n) ? null : n;
+  };
+  const awayMLs = allEntries.map(l => readML(l, 'away')).filter(v => v != null && v !== 0);
+  const homeMLs = allEntries.map(l => readML(l, 'home')).filter(v => v != null && v !== 0);
   const displayAway = awayMLs.length ? Math.max(...awayMLs) : null;
   const displayHome = homeMLs.length ? Math.max(...homeMLs) : null;
   if (formatML(displayAway) && formatML(displayHome)) {
