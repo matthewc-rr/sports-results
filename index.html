@@ -102,6 +102,10 @@
     .odds-val.fav { color: #e05c3b; }
     .odds-val.dog { color: #4f8ef7; }
     .odds-div { color: var(--border); margin: 0 10px; }
+    .odds-implied { font-size: 10px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+    .odds-move { font-size: 10px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
+    .odds-move.move-up { color: #4caf50; }
+    .odds-move.move-dn { color: #e05c3b; }
 
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
@@ -588,6 +592,11 @@ function formatDisplayDate(d) {
 }
 function formatTime(s) { return new Date(s).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'}); }
 function formatML(v) { if (v==null||v===0) return null; return v>0?`+${v}`:`${v}`; }
+function mlToImplied(ml) {
+  if (ml == null || ml === 0) return null;
+  const p = ml < 0 ? (-ml) / (-ml + 100) : 100 / (ml + 100);
+  return Math.round(p * 100);
+}
 function shortDate(s) { return new Date(s).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -787,33 +796,87 @@ function mkPh(abbrev, cls='team-logo-ph') {
 function buildOddsStrip(comp, isFinal) {
   const odds = getOddsEntry(comp);
   if (!odds) return null;
+
+  const isSoccer = SOCCER_IDS.has(comp?._leagueId);
+  const rawAll = comp.odds || comp.pickcenter || [];
+  const allEntries = isSoccer ? rawAll.map(normalizeSoccerOdds) : rawAll;
+  const multiBook = allEntries.length > 1;
+
   const strip = document.createElement('div');
   strip.className = 'odds-strip';
   const lbl = document.createElement('span');
   lbl.className = 'odds-label';
-  lbl.textContent = isFinal ? 'Closing' : (odds.provider?.name || 'Odds');
+  lbl.textContent = isFinal ? 'Closing' : multiBook ? `Best (${allEntries.length})` : (odds.provider?.name || 'Odds');
   strip.appendChild(lbl);
+
   const pill = document.createElement('div');
   pill.className = 'odds-pill';
   const items = [];
-  if (odds.details) items.push({ key:'Spread', val: odds.details==='EVEN'?'Even':odds.details });
-  if (odds.overUnder) items.push({ key:'O/U', val: odds.overUnder });
-  const awayML = formatML(odds.awayTeamOdds?.moneyLine);
-  const homeML = formatML(odds.homeTeamOdds?.moneyLine);
-  if (awayML && homeML) {
+
+  // Spread + line movement (opening → current)
+  if (odds.details) {
+    const spreadVal = odds.details === 'EVEN' ? 'Even' : odds.details;
+    const openSpread = odds.spreadOpen != null ? parseFloat(odds.spreadOpen) : null;
+    const closeSpread = parseFloat(odds.spread ?? odds.details);
+    let moveHtml = '';
+    if (openSpread != null && !isNaN(openSpread) && !isNaN(closeSpread) && Math.abs(openSpread - closeSpread) >= 0.5) {
+      const openStr = openSpread > 0 ? `+${openSpread}` : `${openSpread}`;
+      const dir = closeSpread < openSpread ? '↓' : '↑';
+      const cls = closeSpread < openSpread ? 'move-dn' : 'move-up';
+      moveHtml = ` <span class="odds-move ${cls}">${dir}${openStr}</span>`;
+    }
+    items.push({ html: `<span class="odds-key">Spread</span> <span class="odds-val">${spreadVal}</span>${moveHtml}` });
+  }
+
+  // O/U + line movement
+  if (odds.overUnder) {
+    const ouClose = parseFloat(odds.overUnder);
+    const ouOpen = odds.overUnderOpen != null ? parseFloat(odds.overUnderOpen) : null;
+    let moveHtml = '';
+    if (ouOpen != null && !isNaN(ouOpen) && !isNaN(ouClose) && Math.abs(ouClose - ouOpen) >= 0.5) {
+      const dir = ouClose > ouOpen ? '↑' : '↓';
+      const cls = ouClose > ouOpen ? 'move-up' : 'move-dn';
+      moveHtml = ` <span class="odds-move ${cls}">${dir}${ouOpen}</span>`;
+    }
+    items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}` });
+  }
+
+  // ML: best available across all books + implied probability
+  const awayMLRaw = odds.awayTeamOdds?.moneyLine;
+  const homeMLRaw = odds.homeTeamOdds?.moneyLine;
+  if (formatML(awayMLRaw) && formatML(homeMLRaw)) {
     const aFav = odds.awayTeamOdds?.favorite, hFav = odds.homeTeamOdds?.favorite;
-    items.push({ html:`<span class="odds-key">ML</span> <span class="odds-val ${aFav?'fav':'dog'}">${awayML}</span><span class="odds-div"> / </span><span class="odds-val ${hFav?'fav':'dog'}">${homeML}</span>` });
+
+    const awayMLs = allEntries.map(l => l.awayTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+    const homeMLs = allEntries.map(l => l.homeTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+    const bestAway = awayMLs.length > 1 ? Math.max(...awayMLs) : awayMLRaw;
+    const bestHome = homeMLs.length > 1 ? Math.max(...homeMLs) : homeMLRaw;
+    const displayAway = bestAway ?? awayMLRaw;
+    const displayHome = bestHome ?? homeMLRaw;
+
+    const aImplied = mlToImplied(displayAway);
+    const hImplied = mlToImplied(displayHome);
+
+    let mlHtml = `<span class="odds-key">ML</span> `;
+    mlHtml += `<span class="odds-val ${aFav ? 'fav' : 'dog'}">${formatML(displayAway)}</span>`;
+    if (aImplied) mlHtml += `<span class="odds-implied">${aImplied}%</span>`;
+    mlHtml += `<span class="odds-div"> / </span>`;
+    mlHtml += `<span class="odds-val ${hFav ? 'fav' : 'dog'}">${formatML(displayHome)}</span>`;
+    if (hImplied) mlHtml += `<span class="odds-implied">${hImplied}%</span>`;
+    items.push({ html: mlHtml });
   }
+
   if (odds._drawML != null) {
-    items.push({ html:`<span class="odds-key">Draw</span> <span class="odds-val">${formatML(odds._drawML)}</span>` });
+    items.push({ html: `<span class="odds-key">Draw</span> <span class="odds-val">${formatML(odds._drawML)}</span>` });
   }
-  items.forEach((item,i) => {
-    if (i) { const s=document.createElement('span'); s.className='odds-div'; s.textContent='·'; pill.appendChild(s); }
-    const el = document.createElement('div'); el.className='odds-item';
-    if (item.html) el.innerHTML = item.html;
-    else el.innerHTML = `<span class="odds-key">${item.key}</span> <span class="odds-val">${item.val}</span>`;
+
+  items.forEach((item, i) => {
+    if (i) { const s = document.createElement('span'); s.className = 'odds-div'; s.textContent = '·'; pill.appendChild(s); }
+    const el = document.createElement('div'); el.className = 'odds-item';
+    el.innerHTML = item.html;
     pill.appendChild(el);
   });
+
   if (!items.length) return null;
   strip.appendChild(pill);
   return strip;
