@@ -106,6 +106,8 @@
     .odds-move { font-size: 10px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
     .odds-move.move-up { color: #4caf50; }
     .odds-move.move-dn { color: #e05c3b; }
+    .ou-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
+    .ou-rec-ph:empty { display: none; }
 
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
@@ -460,6 +462,8 @@ let activeSoccerLeague = 'all'; // 'all' | soccer league id
 let cache = {};
 let teamListCache = {}; // { leagueId: [{ id, displayName, abbrev, logo, leagueId }] }
 
+let ouCache = {}; // { 'sport/league/teamId': { over, under, push } | null }
+
 let favorites = JSON.parse(localStorage.getItem('sports-favs') || '{}');
 let atsStore  = JSON.parse(localStorage.getItem('sports-ats')  || '{}');
 let rankingsCache = {};
@@ -776,6 +780,45 @@ async function fetchTeamSchedule(lg, teamId) {
   return r.json();
 }
 
+async function fetchTeamOURecord(teamId, sport, league) {
+  const key = `${sport}/${league}/${teamId}`;
+  if (key in ouCache) return ouCache[key];
+  try {
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${teamId}/schedule`);
+    if (!r.ok) { ouCache[key] = null; return null; }
+    const data = await r.json();
+    let over = 0, under = 0, push = 0;
+    for (const ev of data.events || []) {
+      if (ev.status?.type?.state !== 'post') continue;
+      const comp = ev.competitions?.[0];
+      if (!comp) continue;
+      const odds = comp.odds?.[0] || comp.pickcenter?.[0];
+      const ou = parseFloat(odds?.overUnder);
+      if (isNaN(ou)) continue;
+      const total = (comp.competitors || []).reduce((s, c) => s + (parseInt(c.score) || 0), 0);
+      if (!total) continue;
+      if (total > ou) over++;
+      else if (total < ou) under++;
+      else push++;
+    }
+    ouCache[key] = { over, under, push };
+    return ouCache[key];
+  } catch { ouCache[key] = null; return null; }
+}
+
+async function loadOURecords(strip, awayTeam, homeTeam, lg) {
+  const ph = strip.querySelector('.ou-rec-ph');
+  if (!ph || !awayTeam?.id || !homeTeam?.id) return;
+  const [ar, hr] = await Promise.all([
+    fetchTeamOURecord(awayTeam.id, lg.sport, lg.league),
+    fetchTeamOURecord(homeTeam.id, lg.sport, lg.league),
+  ]);
+  const parts = [];
+  if (ar && (ar.over + ar.under) > 0) parts.push(`${awayTeam.abbreviation||''} ${ar.over}-${ar.under}${ar.push ? `-${ar.push}` : ''}`);
+  if (hr && (hr.over + hr.under) > 0) parts.push(`${homeTeam.abbreviation||''} ${hr.over}-${hr.under}${hr.push ? `-${hr.push}` : ''}`);
+  if (parts.length) ph.textContent = parts.join(' · ');
+}
+
 // ── Render: logo helpers ──────────────────────────────────────────────────────
 function mkLogo(src, abbrev, cls='team-logo', phCls='team-logo-ph') {
   if (src) {
@@ -828,7 +871,7 @@ function buildOddsStrip(comp, isFinal) {
     items.push({ html: `<span class="odds-key">Spread</span> <span class="odds-val">${spreadVal}</span>${moveHtml}` });
   }
 
-  // O/U + line movement
+  // O/U + line movement + team O/U record placeholders
   if (odds.overUnder) {
     const ouClose = parseFloat(odds.overUnder);
     const ouOpen = odds.overUnderOpen != null ? parseFloat(odds.overUnderOpen) : null;
@@ -838,7 +881,8 @@ function buildOddsStrip(comp, isFinal) {
       const cls = ouClose > ouOpen ? 'move-up' : 'move-dn';
       moveHtml = ` <span class="odds-move ${cls}">${dir}${ouOpen}</span>`;
     }
-    items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}` });
+    const recPh = (!isFinal && !TENNIS_IDS.has(comp?._leagueId)) ? ' <span class="ou-rec-ph"></span>' : '';
+    items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}${recPh}` });
   }
 
   // ML: scan ALL entries for best available moneyline (primary entry may lack ML for pre-game)
@@ -989,7 +1033,10 @@ function buildGameCard(event, leagueId, lg) {
 
   // Odds strip
   const odds = buildOddsStrip(comp, isFinal);
-  if (odds) card.appendChild(odds);
+  if (odds) {
+    card.appendChild(odds);
+    if (isPre && lg && !TENNIS_IDS.has(leagueId)) loadOURecords(odds, at, ht, lg);
+  }
 
   // Linescore
   if ((isFinal||isLive)&&(ac.linescores||hc.linescores)) {
