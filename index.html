@@ -520,23 +520,28 @@ let rankingsCache = {};
 const SOCCER_IDS = new Set(['ucl','epl','laliga','mls']);
 const TENNIS_IDS = new Set(['atp','wta']);
 
-// Normalize soccer odds from ESPN's soccer-specific format to the standard awayTeamOdds/homeTeamOdds shape
-function normalizeSoccerOdds(odds) {
-  if (!odds || odds.awayTeamOdds !== undefined) return odds;
-  if (!odds.moneyline) return odds;
+// Normalize ESPN odds entry from new scoreboard format (moneyline.away.close.odds)
+// to old pickcenter format (awayTeamOdds.moneyLine). Safe to apply to all sports.
+function normalizeOddsEntry(odds, forSoccer) {
+  if (!odds) return odds;
+  if (odds.awayTeamOdds?.moneyLine != null) return odds; // already old format with ML
+  if (!odds.moneyline) return odds; // no ML data available
   const awayML = parseInt(odds.moneyline?.away?.close?.odds);
   const homeML = parseInt(odds.moneyline?.home?.close?.odds);
-  const drawML = odds.drawOdds?.moneyLine ?? parseInt(odds.moneyline?.draw?.close?.odds);
   const spreadLine = odds.pointSpread?.away?.close?.line ?? odds.details;
-  return {
+  const out = {
     ...odds,
-    awayTeamOdds: { moneyLine: isNaN(awayML) ? null : awayML, favorite: awayML < 0 },
-    homeTeamOdds: { moneyLine: isNaN(homeML) ? null : homeML, favorite: homeML < 0 },
-    _drawML: isNaN(drawML) ? null : drawML,
+    awayTeamOdds: { ...odds.awayTeamOdds, moneyLine: isNaN(awayML) ? null : awayML, favorite: awayML < 0 },
+    homeTeamOdds: { ...odds.homeTeamOdds, moneyLine: isNaN(homeML) ? null : homeML, favorite: homeML < 0 },
     details: spreadLine || odds.details,
-    _isSoccer: true,
   };
+  if (forSoccer) {
+    const drawML = odds.drawOdds?.moneyLine ?? parseInt(odds.moneyline?.draw?.close?.odds);
+    out._drawML = isNaN(drawML) ? null : drawML;
+  }
+  return out;
 }
+function normalizeSoccerOdds(odds) { return normalizeOddsEntry(odds, true); }
 
 function getOddsEntry(comp) {
   const raw = comp?.odds?.[0] || comp?.pickcenter?.[0];
@@ -1160,7 +1165,7 @@ function buildOddsStrip(comp, isFinal) {
   const isSoccer = SOCCER_IDS.has(comp?._leagueId);
   // Combine both odds and pickcenter — ML often lives in pickcenter even when comp.odds exists
   const rawAll = [...(comp.odds || []), ...(comp.pickcenter || [])];
-  const allEntries = isSoccer ? rawAll.map(normalizeSoccerOdds) : rawAll;
+  const allEntries = rawAll.map(e => normalizeOddsEntry(e, isSoccer));
   const multiBook = allEntries.length > 1;
 
   const strip = document.createElement('div');
@@ -1204,16 +1209,9 @@ function buildOddsStrip(comp, isFinal) {
     items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}${recPh}` });
   }
 
-  // ML: scan ALL entries — old pickcenter format uses awayTeamOdds.moneyLine (number),
-  // new odds format uses moneyline.away.close.odds (string like "+113" or "-136")
-  const readML = (entry, side) => {
-    const old = entry?.[side + 'TeamOdds']?.moneyLine;
-    if (old != null && old !== 0) return old;
-    const n = parseInt(entry?.moneyline?.[side]?.close?.odds);
-    return isNaN(n) ? null : n;
-  };
-  const awayMLs = allEntries.map(l => readML(l, 'away')).filter(v => v != null && v !== 0);
-  const homeMLs = allEntries.map(l => readML(l, 'home')).filter(v => v != null && v !== 0);
+  // ML: allEntries are already normalized so awayTeamOdds.moneyLine is always the right field
+  const awayMLs = allEntries.map(l => l.awayTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+  const homeMLs = allEntries.map(l => l.homeTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
   const displayAway = awayMLs.length ? Math.max(...awayMLs) : null;
   const displayHome = homeMLs.length ? Math.max(...homeMLs) : null;
   if (formatML(displayAway) && formatML(displayHome)) {
@@ -2046,7 +2044,7 @@ function renderOddsModal(event, lg, summary) {
   const rawLines = (summary?.pickcenter?.length ? summary.pickcenter : null)
     || (summary?.odds?.length ? summary.odds : null)
     || comp?.odds || comp?.pickcenter || [];
-  const lines = isSoccer ? rawLines.map(normalizeSoccerOdds) : rawLines;
+  const lines = rawLines.map(e => normalizeOddsEntry(e, isSoccer));
 
   if (!lines.length) {
     body.innerHTML = '<div class="no-odds-msg">No odds available yet for this game.</div>';
