@@ -58,7 +58,7 @@
 
     /* Main */
     main { max-width: 960px; margin: 0 auto; padding: 22px 18px 60px; }
-    .section-header { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
+    .section-header { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
     .section-header:first-child { margin-top: 0; }
     .section-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
@@ -73,47 +73,47 @@
     .team.home { flex-direction: row-reverse; text-align: right; }
     .team-logo-wrap { position: relative; flex-shrink: 0; }
     .team-logo { width: 40px; height: 40px; object-fit: contain; display: block; }
-    .team-logo-ph { width: 40px; height: 40px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--muted); }
+    .team-logo-ph { width: 40px; height: 40px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--muted); }
     .fav-btn { position: absolute; top: -4px; right: -4px; background: var(--bg); border: 1px solid var(--border); border-radius: 50%; width: 17px; height: 17px; font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s, background .15s; z-index: 2; }
     .game-card:hover .fav-btn { opacity: 1; }
     .fav-btn.on { opacity: 1; background: var(--gold); border-color: var(--gold); }
     .fav-btn:hover { background: var(--gold); border-color: var(--gold); }
-    .team-name { font-size: 14px; font-weight: 600; line-height: 1.2; }
-    .team-record { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .team-name { font-size: 15px; font-weight: 600; line-height: 1.2; }
+    .team-record { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .team.winner .team-name { color: #fff; }
     .team.loser .team-name { color: var(--muted); }
     .score-block { text-align: center; min-width: 108px; }
     .scores { display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .score { font-size: 25px; font-weight: 800; line-height: 1; }
+    .score { font-size: 26px; font-weight: 800; line-height: 1; }
     .score.winner { color: #fff; }
     .score.loser { color: var(--muted); }
-    .score-sep { font-size: 19px; color: var(--border); }
-    .game-time { font-size: 19px; font-weight: 700; color: var(--muted); }
-    .game-status { font-size: 11px; font-weight: 600; margin-top: 4px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+    .score-sep { font-size: 20px; color: var(--border); }
+    .game-time { font-size: 20px; font-weight: 700; color: var(--muted); }
+    .game-status { font-size: 12px; font-weight: 600; margin-top: 4px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
     .s-final { background: rgba(100,200,120,.12); color: #6dc87a; }
     .s-live { background: rgba(255,80,80,.12); color: #ff6060; animation: pulse 1.5s ease-in-out infinite; }
     .s-pre { background: var(--surface2); color: var(--muted); }
-    .series-info { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .venue-info { font-size: 11px; color: var(--border); margin-top: 2px; }
-    .upset-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 800; letter-spacing: 1px; background: rgba(255,160,40,.15); color: #ffaa28; border: 1px solid rgba(255,160,40,.3); }
+    .series-info { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .venue-info { font-size: 12px; color: var(--border); margin-top: 2px; }
+    .upset-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 1px; background: rgba(255,160,40,.15); color: #ffaa28; border: 1px solid rgba(255,160,40,.3); }
 
     /* Odds */
-    .odds-strip { border-top: 1px solid var(--border); padding: 7px 17px; display: flex; align-items: center; gap: 0; font-size: 12px; overflow-x: auto; scrollbar-width: none; }
+    .odds-strip { border-top: 1px solid var(--border); padding: 7px 17px; display: flex; align-items: center; gap: 0; font-size: 13px; overflow-x: auto; scrollbar-width: none; }
     .odds-strip::-webkit-scrollbar { display: none; }
-    .odds-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-right: 8px; white-space: nowrap; letter-spacing: .5px; }
+    .odds-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-right: 8px; white-space: nowrap; letter-spacing: .5px; }
     .odds-pill { display: flex; align-items: center; gap: 0; flex-wrap: nowrap; }
     .odds-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-    .odds-key { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
-    .odds-val { font-size: 12px; font-weight: 600; color: var(--text); }
+    .odds-key { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+    .odds-val { font-size: 13px; font-weight: 600; color: var(--text); }
     .odds-val.fav { color: #e05c3b; }
     .odds-val.dog { color: #4f8ef7; }
     .odds-div { color: var(--border); margin: 0 10px; }
-    .odds-implied { font-size: 11px; color: #a0a8c0; font-weight: 600; margin-left: 3px; }
-    .odds-move { font-size: 10px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
+    .odds-implied { font-size: 12px; color: #a0a8c0; font-weight: 600; margin-left: 3px; }
+    .odds-move { font-size: 11px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
     .odds-move.move-up { color: #4caf50; }
     .odds-move.move-dn { color: #e05c3b; }
-    .steam-badge { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(239,68,68,.15); color: #ef4444; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
-    .ou-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
+    .steam-badge { font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(239,68,68,.15); color: #ef4444; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+    .ou-rec-ph { font-size: 11px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
 
     /* Recap / Summary tab */
     .recap-wrap { padding: 20px; max-width: 740px; margin: 0 auto; }
@@ -137,18 +137,18 @@
     .recap-stat { font-size: 12px; color: #a0a8c0; padding-top: 3px; line-height: 1.4; }
     .recap-game-emoji { font-size: 15px; flex-shrink: 0; }
     .ou-rec-ph:empty { display: none; }
-    .ats-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
+    .ats-rec-ph { font-size: 11px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
     .ats-rec-ph:empty { display: none; }
-    .ats-wl-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; }
+    .ats-wl-ph { font-size: 11px; color: #a0a8c0; font-weight: 600; }
     .ats-wl-ph:empty { display: none; }
 
     /* Probable pitchers */
-    .pitchers { border-top: 1px solid var(--border); padding: 7px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+    .pitchers { border-top: 1px solid var(--border); padding: 7px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
     .pitcher { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
-    .pitcher-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
-    .pitcher-rec  { font-size: 10px; color: var(--muted); }
-    .pitcher-vs   { font-size: 11px; color: var(--muted); font-weight: 600; flex-shrink: 0; }
-    .pitcher-lbl  { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .pitcher-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+    .pitcher-rec  { font-size: 11px; color: var(--muted); }
+    .pitcher-vs   { font-size: 12px; color: var(--muted); font-weight: 600; flex-shrink: 0; }
+    .pitcher-lbl  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
     /* Glossary */
     .glossary-wrap { padding: 20px; max-width: 740px; margin: 0 auto; }
@@ -164,16 +164,16 @@
 
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
-    .linescore table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 260px; }
+    .linescore table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 260px; }
     .linescore th, .linescore td { padding: 3px 7px; text-align: center; color: var(--muted); }
-    .linescore th { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .linescore th { font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .linescore td:first-child, .linescore th:first-child { text-align: left; }
     .linescore td:first-child { font-weight: 600; color: var(--text); }
     .linescore .tot { font-weight: 700; color: var(--text); }
     .linescore .win-row td { color: var(--text); }
 
     /* League badge (favs tab) */
-    .league-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: var(--surface2); margin-bottom: 6px; }
+    .league-badge { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; background: var(--surface2); margin-bottom: 6px; }
 
     /* ATS summary */
     .ats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 24px; }
