@@ -841,19 +841,14 @@ function buildOddsStrip(comp, isFinal) {
     items.push({ html: `<span class="odds-key">O/U</span> <span class="odds-val">${odds.overUnder}</span>${moveHtml}` });
   }
 
-  // ML: best available across all books + implied probability
-  const awayMLRaw = odds.awayTeamOdds?.moneyLine;
-  const homeMLRaw = odds.homeTeamOdds?.moneyLine;
-  if (formatML(awayMLRaw) && formatML(homeMLRaw)) {
-    const aFav = odds.awayTeamOdds?.favorite, hFav = odds.homeTeamOdds?.favorite;
-
-    const awayMLs = allEntries.map(l => l.awayTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
-    const homeMLs = allEntries.map(l => l.homeTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
-    const bestAway = awayMLs.length > 1 ? Math.max(...awayMLs) : awayMLRaw;
-    const bestHome = homeMLs.length > 1 ? Math.max(...homeMLs) : homeMLRaw;
-    const displayAway = bestAway ?? awayMLRaw;
-    const displayHome = bestHome ?? homeMLRaw;
-
+  // ML: scan ALL entries for best available moneyline (primary entry may lack ML for pre-game)
+  const awayMLs = allEntries.map(l => l.awayTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+  const homeMLs = allEntries.map(l => l.homeTeamOdds?.moneyLine).filter(v => v != null && v !== 0);
+  const displayAway = awayMLs.length ? Math.max(...awayMLs) : null;
+  const displayHome = homeMLs.length ? Math.max(...homeMLs) : null;
+  if (formatML(displayAway) && formatML(displayHome)) {
+    // fav/dog coloring: negative ML = favorite
+    const aFav = displayAway < 0, hFav = displayHome < 0;
     const aImplied = mlToImplied(displayAway);
     const hImplied = mlToImplied(displayHome);
 
