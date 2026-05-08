@@ -690,11 +690,21 @@ async function fetchScoreboard(lg, dateStr) {
   return data;
 }
 
+function needsOddsEnrich(ev) {
+  const c = ev.competitions?.[0];
+  if (!c || c._enriched) return false;
+  const state = ev.status?.type?.state;
+  if (state === 'post') return !c.odds?.length && !c.pickcenter?.length;
+  if (state === 'pre') {
+    // ESPN scoreboard often returns spread/O/U but no moneyline — fetch summary to get ML
+    const hasMl = (c.odds || c.pickcenter || []).some(o => o.awayTeamOdds?.moneyLine && o.awayTeamOdds.moneyLine !== 0);
+    return !hasMl;
+  }
+  return false;
+}
+
 async function enrichWithOdds(events, lg) {
-  const need = events.filter(e => {
-    const c = e.competitions?.[0];
-    return e.status?.type?.state==='post' && !c?.odds?.length && !c?._enriched;
-  });
+  const need = events.filter(needsOddsEnrich);
   if (!need.length) return;
   await Promise.allSettled(need.map(async ev => {
     try {
@@ -1398,11 +1408,8 @@ async function loadTopGames() {
     (data.events || []).forEach(ev => allByLeague[lg.id].push({ ev, lg }));
   });
 
-  // Enrich pre-game events that have no odds yet — fetch summaries in parallel
-  const needEnrich = Object.values(allByLeague).flat().filter(({ ev }) => {
-    const c = ev.competitions?.[0];
-    return ev.status?.type?.state === 'pre' && !c?.odds?.length && !c?.pickcenter?.length && !c?._enriched;
-  });
+  // Enrich pre-game events that lack moneyline data — fetch summaries in parallel
+  const needEnrich = Object.values(allByLeague).flat().filter(({ ev }) => needsOddsEnrich(ev));
   await Promise.allSettled(needEnrich.map(async ({ ev, lg }) => {
     try {
       const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/summary?event=${ev.id}`);
