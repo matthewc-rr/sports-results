@@ -708,12 +708,22 @@ async function fetchStandings(lg) {
 
 async function fetchTeams(lg) {
   if (teamListCache[lg.id]) return teamListCache[lg.id];
+  // Tennis has no teams endpoint — use player rankings instead
+  if (TENNIS_IDS.has(lg.id)) {
+    await fetchTennisRankings(lg);
+    return teamListCache[lg.id] || [];
+  }
   const url = `https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/teams?limit=100`;
   const r = await fetch(url); if (!r.ok) return [];
   const data = await r.json();
   const teams = (data.sports?.[0]?.leagues?.[0]?.teams || []).map(t => ({
-    id: t.team.id, displayName: t.team.displayName,
-    abbrev: t.team.abbreviation, logo: t.team.logos?.[0]?.href || t.team.logo,
+    id: t.team.id,
+    displayName: t.team.displayName,
+    abbrev: t.team.abbreviation,
+    shortDisplayName: t.team.shortDisplayName || '',
+    nickname: t.team.nickname || '',
+    location: t.team.location || '',
+    logo: t.team.logos?.[0]?.href || t.team.logo,
     leagueId: lg.id,
   }));
   teamListCache[lg.id] = teams;
@@ -724,16 +734,30 @@ async function fetchTennisRankings(lg) {
   if (rankingsCache[lg.id]) return rankingsCache[lg.id];
   try {
     const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/rankings`);
-    if (!r.ok) return {};
+    if (!r.ok) { rankingsCache[lg.id] = {}; return {}; }
     const data = await r.json();
     const map = {};
+    const players = [];
     for (const rank of data.rankings?.[0]?.ranks || []) {
       const id = rank.athlete?.id;
-      if (id) map[id] = rank.current;
+      if (!id) continue;
+      map[id] = rank.current;
+      players.push({
+        id,
+        displayName: rank.athlete?.displayName || '?',
+        abbrev: rank.athlete?.shortname || '',
+        shortDisplayName: rank.athlete?.shortname || '',
+        nickname: '',
+        location: rank.athlete?.flag?.alt || '',
+        logo: rank.athlete?.flag?.href || null,
+        leagueId: lg.id,
+        rank: rank.current,
+      });
     }
     rankingsCache[lg.id] = map;
+    teamListCache[lg.id] = players; // reuse team search cache for players
     return map;
-  } catch { return {}; }
+  } catch { rankingsCache[lg.id] = {}; return {}; }
 }
 
 async function fetchTeamSchedule(lg, teamId) {
@@ -1009,8 +1033,8 @@ let allTeams = []; // flat list loaded once
 async function openSearch() {
   document.getElementById('search-overlay').classList.add('open');
   document.getElementById('search-input').focus();
-  if (!allTeams.length) {
-    document.getElementById('search-body').innerHTML='<div class="state-box" style="padding:30px"><div class="spinner"></div><p>Loading teams…</p></div>';
+  if (allTeams.length < 10) { // re-fetch if empty or suspiciously small (e.g. from a previous failed load)
+    document.getElementById('search-body').innerHTML='<div class="state-box" style="padding:30px"><div class="spinner"></div><p>Loading…</p></div>';
     const lists = await Promise.allSettled(allLeagues().map(fetchTeams));
     allTeams = lists.flatMap(r => r.status==='fulfilled' ? r.value : []);
   }
@@ -1026,8 +1050,11 @@ function filterSearch(q) {
   const body = document.getElementById('search-body');
   const s = q.trim().toLowerCase();
   if (!s) { body.innerHTML='<div class="state-box" style="padding:30px"><p>Type to search teams across all leagues.</p></div>'; return; }
-  const matches = allTeams.filter(t => t.displayName.toLowerCase().includes(s) || t.abbrev.toLowerCase().includes(s));
-  if (!matches.length) { body.innerHTML='<div class="state-box" style="padding:30px"><p>No teams found.</p></div>'; return; }
+  const matches = allTeams.filter(t =>
+    [t.displayName, t.abbrev, t.shortDisplayName, t.nickname, t.location]
+      .some(v => v && v.toLowerCase().includes(s))
+  );
+  if (!matches.length) { body.innerHTML='<div class="state-box" style="padding:30px"><p>No results found.</p></div>'; return; }
   body.innerHTML='';
   const byLeague = {};
   matches.forEach(t => { (byLeague[t.leagueId]||(byLeague[t.leagueId]=[])).push(t); });
@@ -1039,8 +1066,20 @@ function filterSearch(q) {
     byLeague[lg.id].forEach(team => {
       const row=document.createElement('div'); row.className='search-team-row';
       row.appendChild(mkLogo(team.logo,team.abbrev,'search-team-logo','search-team-logo-ph'));
+      const nameWrap=document.createElement('div');
       const n=document.createElement('span'); n.className='search-team-name'; n.textContent=team.displayName;
-      row.appendChild(n);
+      nameWrap.appendChild(n);
+      if (team.nickname && team.nickname !== team.displayName && !TENNIS_IDS.has(lg.id)) {
+        const sub=document.createElement('div'); sub.style.cssText='font-size:11px;color:var(--muted);margin-top:1px;';
+        sub.textContent = team.location && team.location !== team.displayName ? team.location : team.nickname;
+        nameWrap.appendChild(sub);
+      }
+      if (team.rank) {
+        const sub=document.createElement('div'); sub.style.cssText='font-size:11px;color:var(--muted);margin-top:1px;';
+        sub.textContent=`#${team.rank} ${lg.label}`;
+        nameWrap.appendChild(sub);
+      }
+      row.appendChild(nameWrap);
       if (isFav(team.id)) { const s=document.createElement('span'); s.className='search-team-fav'; s.textContent='★'; row.appendChild(s); }
       row.addEventListener('click', () => showTeamDetail(team, lg));
       g.appendChild(row);
