@@ -141,6 +141,14 @@
     .ats-wl-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; }
     .ats-wl-ph:empty { display: none; }
 
+    /* Probable pitchers */
+    .pitchers { border-top: 1px solid var(--border); padding: 7px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+    .pitcher { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; }
+    .pitcher-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+    .pitcher-rec  { font-size: 10px; color: var(--muted); }
+    .pitcher-vs   { font-size: 11px; color: var(--muted); font-weight: 600; flex-shrink: 0; }
+    .pitcher-lbl  { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
     /* Linescore */
     .linescore { border-top: 1px solid var(--border); padding: 7px 17px; overflow-x: auto; }
     .linescore table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 260px; }
@@ -1362,6 +1370,28 @@ function buildGameCard(event, leagueId, lg) {
   if ((isFinal||isLive)&&(ac.linescores||hc.linescores)) {
     const ls=buildLinescore(comp,leagueId);
     if (ls) card.appendChild(ls);
+  }
+
+  // Probable pitchers (MLB pre-game)
+  if (leagueId === 'mlb' && isPre) {
+    const aProb = ac.probables?.[0], hProb = hc.probables?.[0];
+    if (aProb || hProb) {
+      const row = document.createElement('div'); row.className = 'pitchers';
+      const mkPitcher = (prob, side) => {
+        const d = document.createElement('div'); d.className = 'pitcher';
+        const lbl = document.createElement('div'); lbl.className = 'pitcher-lbl'; lbl.textContent = side;
+        const name = document.createElement('div'); name.className = 'pitcher-name';
+        name.textContent = prob?.athlete?.shortName || prob?.athlete?.displayName || 'TBD';
+        d.appendChild(lbl); d.appendChild(name);
+        if (prob?.record) { const rec = document.createElement('div'); rec.className = 'pitcher-rec'; rec.textContent = prob.record; d.appendChild(rec); }
+        return d;
+      };
+      const vs = document.createElement('div'); vs.className = 'pitcher-vs'; vs.textContent = 'vs';
+      row.appendChild(mkPitcher(aProb, 'Away SP'));
+      row.appendChild(vs);
+      row.appendChild(mkPitcher(hProb, 'Home SP'));
+      card.appendChild(row);
+    }
   }
 
   // Record ATS for favorite teams
