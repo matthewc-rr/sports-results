@@ -458,6 +458,7 @@ let teamListCache = {}; // { leagueId: [{ id, displayName, abbrev, logo, leagueI
 
 let favorites = JSON.parse(localStorage.getItem('sports-favs') || '{}');
 let atsStore  = JSON.parse(localStorage.getItem('sports-ats')  || '{}');
+let rankingsCache = {};
 // atsStore: { [teamId]: { w,l,p, seen: [eventId,...] } }
 
 const SOCCER_IDS = new Set(['ucl','epl','laliga','mls']);
@@ -713,6 +714,22 @@ async function fetchTeams(lg) {
   }));
   teamListCache[lg.id] = teams;
   return teams;
+}
+
+async function fetchTennisRankings(lg) {
+  if (rankingsCache[lg.id]) return rankingsCache[lg.id];
+  try {
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/rankings`);
+    if (!r.ok) return {};
+    const data = await r.json();
+    const map = {};
+    for (const rank of data.rankings?.[0]?.ranks || []) {
+      const id = rank.athlete?.id;
+      if (id) map[id] = rank.current;
+    }
+    rankingsCache[lg.id] = map;
+    return map;
+  } catch { return {}; }
 }
 
 async function fetchTeamSchedule(lg, teamId) {
@@ -1324,6 +1341,46 @@ async function loadLeague(leagueId) {
   const events=data.events||[];
   if (!events.length) { main.innerHTML=`<div class="state-box"><div class="icon">📅</div><p>No ${lg.label} games on ${formatDisplayDate(currentDate)}.</p></div>`; return; }
   await enrichWithOdds(events,lg);
+
+  if (TENNIS_IDS.has(leagueId)) {
+    const rankMap = await fetchTennisRankings(lg);
+    const rankLabel = lg.id === 'atp' ? 'ATP' : 'WTA';
+
+    // Inject ranking into competitor records so it shows on the card
+    events.forEach(ev => {
+      (ev.competitions?.[0]?.competitors || []).forEach(c => {
+        const rank = rankMap[c.team?.id];
+        c.records = rank ? [{ summary: `#${rank} ${rankLabel}` }] : [];
+      });
+    });
+
+    // Sort by minimum ranking of participants (best-ranked match first, unranked last)
+    const minRank = ev => Math.min(...(ev.competitions?.[0]?.competitors || []).map(c => rankMap[c.team?.id] || 9999));
+    const sorted = [...events].sort((a, b) => minRank(a) - minRank(b));
+
+    // Group by tournament name
+    const byTournament = {};
+    sorted.forEach(ev => {
+      const t = ev.competitions?.[0]?._tournament || 'Matches';
+      (byTournament[t] = byTournament[t] || []).push(ev);
+    });
+
+    main.innerHTML = '';
+    for (const [tournament, tevents] of Object.entries(byTournament)) {
+      const sh = document.createElement('div'); sh.className = 'section-header';
+      sh.textContent = tournament;
+      main.appendChild(sh);
+      const live_t = tevents.filter(e => e.status?.type?.state === 'in');
+      const final_t = tevents.filter(e => e.status?.type?.state === 'post');
+      const sched_t = tevents.filter(e => e.status?.type?.state === 'pre');
+      const grid = document.createElement('div'); grid.className = 'games-grid';
+      [...live_t, ...final_t, ...sched_t].forEach(ev => { const c = buildGameCard(ev, leagueId, lg); if (c) grid.appendChild(c); });
+      main.appendChild(grid);
+    }
+    if (events.some(e => e.status?.type?.state === 'in')) setTimeout(loadGames, 30000);
+    return;
+  }
+
   main.innerHTML='';
   const favGames=events.filter(e=>(e.competitions?.[0]?.competitors||[]).some(c=>isFav(c.team?.id)));
   const live=events.filter(e=>e.status?.type?.state==='in');
