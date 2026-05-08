@@ -112,6 +112,7 @@
     .odds-move { font-size: 10px; font-weight: 600; margin-left: 3px; white-space: nowrap; }
     .odds-move.move-up { color: #4caf50; }
     .odds-move.move-dn { color: #e05c3b; }
+    .steam-badge { font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(239,68,68,.15); color: #ef4444; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
     .ou-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
 
     /* Recap / Summary tab */
@@ -526,13 +527,15 @@ function normalizeOddsEntry(odds, forSoccer) {
   if (!odds) return odds;
   if (odds.awayTeamOdds?.moneyLine != null) return odds; // already old format with ML
   if (!odds.moneyline) return odds; // no ML data available
-  const awayML = parseInt(odds.moneyline?.away?.close?.odds);
-  const homeML = parseInt(odds.moneyline?.home?.close?.odds);
+  const awayML     = parseInt(odds.moneyline?.away?.close?.odds);
+  const homeML     = parseInt(odds.moneyline?.home?.close?.odds);
+  const awayOpenML = parseInt(odds.moneyline?.away?.open?.odds);
+  const homeOpenML = parseInt(odds.moneyline?.home?.open?.odds);
   const spreadLine = odds.pointSpread?.away?.close?.line ?? odds.details;
   const out = {
     ...odds,
-    awayTeamOdds: { ...odds.awayTeamOdds, moneyLine: isNaN(awayML) ? null : awayML, favorite: awayML < 0 },
-    homeTeamOdds: { ...odds.homeTeamOdds, moneyLine: isNaN(homeML) ? null : homeML, favorite: homeML < 0 },
+    awayTeamOdds: { ...odds.awayTeamOdds, moneyLine: isNaN(awayML) ? null : awayML, openMoneyLine: isNaN(awayOpenML) ? null : awayOpenML, favorite: awayML < 0 },
+    homeTeamOdds: { ...odds.homeTeamOdds, moneyLine: isNaN(homeML) ? null : homeML, openMoneyLine: isNaN(homeOpenML) ? null : homeOpenML, favorite: homeML < 0 },
     details: spreadLine || odds.details,
   };
   if (forSoccer) {
@@ -1215,16 +1218,27 @@ function buildOddsStrip(comp, isFinal) {
   const displayAway = awayMLs.length ? Math.max(...awayMLs) : null;
   const displayHome = homeMLs.length ? Math.max(...homeMLs) : null;
   if (formatML(displayAway) && formatML(displayHome)) {
-    // fav/dog coloring: negative ML = favorite
     const aFav = displayAway < 0, hFav = displayHome < 0;
     const aImplied = mlToImplied(displayAway);
     const hImplied = mlToImplied(displayHome);
 
-    let mlHtml = `<span class="odds-key">ML</span> `;
+    // Opening ML from first entry that has it
+    const openAway = allEntries.map(l => l.awayTeamOdds?.openMoneyLine).find(v => v != null && v !== 0) ?? null;
+    const openHome = allEntries.map(l => l.homeTeamOdds?.openMoneyLine).find(v => v != null && v !== 0) ?? null;
+    const aMove = openAway != null && openAway !== displayAway ? displayAway - openAway : null;
+    const hMove = openHome != null && openHome !== displayHome ? displayHome - openHome : null;
+    const STEAM = 10; // ≥10 cents of movement = steam
+    const isSteam = (aMove != null && Math.abs(aMove) >= STEAM) || (hMove != null && Math.abs(hMove) >= STEAM);
+
+    let mlHtml = '';
+    if (isSteam) mlHtml += `<span class="steam-badge">STEAM</span>`;
+    mlHtml += `<span class="odds-key">ML</span> `;
     mlHtml += `<span class="odds-val ${aFav ? 'fav' : 'dog'}">${formatML(displayAway)}</span>`;
+    if (aMove != null) { const dir = aMove > 0 ? '↑' : '↓'; mlHtml += `<span class="odds-move ${aMove > 0 ? 'move-up' : 'move-dn'}">${dir}${formatML(openAway)}</span>`; }
     if (aImplied) mlHtml += `<span class="odds-implied">(${aImplied}%)</span>`;
     mlHtml += `<span class="odds-div"> / </span>`;
     mlHtml += `<span class="odds-val ${hFav ? 'fav' : 'dog'}">${formatML(displayHome)}</span>`;
+    if (hMove != null) { const dir = hMove > 0 ? '↑' : '↓'; mlHtml += `<span class="odds-move ${hMove > 0 ? 'move-up' : 'move-dn'}">${dir}${formatML(openHome)}</span>`; }
     if (hImplied) mlHtml += `<span class="odds-implied">(${hImplied}%)</span>`;
     items.push({ html: mlHtml });
   }
