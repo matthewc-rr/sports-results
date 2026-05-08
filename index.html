@@ -109,17 +109,25 @@
     .ou-rec-ph { font-size: 10px; color: #a0a8c0; font-weight: 600; margin-left: 6px; }
 
     /* Recap / Summary tab */
-    .summary-wrap { padding: 20px; max-width: 740px; margin: 0 auto; }
-    .summary-hdr { margin-bottom: 20px; }
-    .summary-title { font-size: 20px; font-weight: 700; }
-    .summary-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
-    .summary-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; }
-    .summary-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 10px; }
-    .summary-item { font-size: 14px; color: var(--text); padding: 9px 0; border-top: 1px solid var(--border); line-height: 1.5; display: flex; align-items: flex-start; gap: 8px; }
-    .summary-item:first-of-type { border-top: none; padding-top: 0; }
-    .summary-item-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-    .summary-item-body { flex: 1; }
-    .summary-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 5px; margin-left: 5px; vertical-align: middle; }
+    .recap-wrap { padding: 20px; max-width: 740px; margin: 0 auto; }
+    .recap-hdr { margin-bottom: 20px; }
+    .recap-title { font-size: 20px; font-weight: 700; }
+    .recap-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .recap-league { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+    .recap-league-hdr { padding: 11px 16px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; border-bottom: 1px solid var(--border); }
+    .recap-league-count { font-size: 11px; color: var(--muted); font-weight: 500; margin-left: auto; }
+    .recap-game { padding: 9px 16px; border-bottom: 1px solid var(--border); }
+    .recap-game:last-child { border-bottom: none; }
+    .recap-scoreline { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; }
+    .recap-team { color: var(--muted); white-space: nowrap; }
+    .recap-team.w { color: var(--text); font-weight: 700; }
+    .recap-score-nums { font-size: 14px; font-weight: 700; color: var(--text); }
+    .recap-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 5px; white-space: nowrap; }
+    .recap-badge.upset { background: rgba(239,68,68,.15); color: #ef4444; }
+    .recap-badge.ot { background: rgba(99,102,241,.15); color: #818cf8; }
+    .recap-badge.close { background: rgba(250,204,21,.12); color: #fbbf24; }
+    .recap-stats { padding: 4px 0 0 2px; }
+    .recap-stat { font-size: 12px; color: #a0a8c0; padding-top: 3px; line-height: 1.4; }
     .ou-rec-ph:empty { display: none; }
 
     /* Linescore */
@@ -892,137 +900,131 @@ function extractNotableStats(summary, sport) {
   return results;
 }
 
-function mkRecapSection(title, color, items) {
-  const sec = document.createElement('div'); sec.className = 'summary-section';
-  const h = document.createElement('div'); h.className = 'summary-section-title';
-  h.innerHTML = `<span style="color:${color}">${title}</span>`;
-  sec.appendChild(h);
-  items.forEach(({ icon, html }) => {
-    const row = document.createElement('div'); row.className = 'summary-item';
-    row.innerHTML = `<span class="summary-item-icon">${icon}</span><span class="summary-item-body">${html}</span>`;
-    sec.appendChild(row);
-  });
-  return sec;
-}
-
 async function loadSummary() {
   const main = document.getElementById('main');
   main.innerHTML = '<div class="state-box"><div class="spinner"></div><p>Loading recap…</p></div>';
 
   const dateStr = toESPNDate(currentDate);
   const leagues = [...LEAGUES.filter(l => !TENNIS_IDS.has(l.id)), ...SOCCER_LEAGUES];
+  const CLOSE_THRESH = { basketball:5, hockey:1, baseball:1, football:3, soccer:1 };
+  const SPORT_EMOJI  = { basketball:'🏀', hockey:'🏒', baseball:'⚾', football:'🏈', soccer:'⚽' };
 
-  const sbResults = await Promise.allSettled(leagues.map(lg => fetchScoreboard(lg, dateStr).then(d => ({ lg, data: d }))));
+  const sbResults = await Promise.allSettled(leagues.map(lg =>
+    fetchScoreboard(lg, dateStr).then(d => ({ lg, data: d }))
+  ));
 
-  const completed = [];
+  // Group completed games by league, annotate with upset/close flags
+  const byLeague = {}; // leagueId -> { lg, games[] }
   for (const r of sbResults) {
     if (r.status !== 'fulfilled') continue;
     const { lg, data } = r.value;
     for (const ev of data.events || []) {
-      if (ev.status?.type?.state === 'post') completed.push({ ev, lg });
+      if (ev.status?.type?.state !== 'post') continue;
+      const comp = ev.competitions?.[0]; if (!comp) continue;
+      const cs = comp.competitors || [];
+      const ac = cs.find(c=>c.homeAway==='away')||cs[0];
+      const hc = cs.find(c=>c.homeAway==='home')||cs[1];
+      if (!ac||!hc) continue;
+      const aScore = parseInt(ac.score), hScore = parseInt(hc.score);
+      if (isNaN(aScore)||isNaN(hScore)) continue;
+      const awayWon = aScore > hScore, margin = Math.abs(aScore-hScore);
+      const at = ac.team||{}, ht = hc.team||{};
+
+      const odds = getOddsEntry(comp);
+      let isUpset = false, upsetML = null;
+      if (odds) {
+        const aFav = odds.awayTeamOdds?.favorite, hFav = odds.homeTeamOdds?.favorite;
+        if ((awayWon && hFav) || (!awayWon && aFav)) {
+          isUpset = true;
+          upsetML = awayWon ? odds.awayTeamOdds?.moneyLine : odds.homeTeamOdds?.moneyLine;
+        }
+      }
+
+      const detail = ev.status?.type?.shortDetail || '';
+      const otSuffix = /\bOT\b|OT\d/.test(detail) ? 'OT' : /\bSO\b/.test(detail) ? 'SO' : '';
+      const isClose = margin <= (CLOSE_THRESH[lg.sport] ?? 3);
+
+      if (!byLeague[lg.id]) byLeague[lg.id] = { lg, games: [] };
+      byLeague[lg.id].games.push({ ev, lg, at, ht, aScore, hScore, awayWon, isUpset, upsetML, isClose, otSuffix, stats: [] });
     }
   }
 
-  if (!completed.length) {
+  if (!Object.keys(byLeague).length) {
     main.innerHTML = `<div class="state-box"><p>No completed games on ${formatDisplayDate(currentDate)}.</p></div>`;
     return;
   }
 
-  // Upsets and close games — from scoreboard data, no extra fetches needed
-  const upsets = [], closeGames = [];
-  const CLOSE = { basketball:5, hockey:1, baseball:1, football:3, soccer:1 };
-
-  for (const { ev, lg } of completed) {
-    const comp = ev.competitions?.[0]; if (!comp) continue;
-    const cs = comp.competitors || [];
-    const ac = cs.find(c=>c.homeAway==='away')||cs[0], hc = cs.find(c=>c.homeAway==='home')||cs[1];
-    if (!ac||!hc) continue;
-    const as_ = parseInt(ac.score), hs = parseInt(hc.score);
-    if (isNaN(as_)||isNaN(hs)) continue;
-    const awayWon = as_ > hs, margin = Math.abs(as_-hs);
-    const at = ac.team||{}, ht = hc.team||{};
-
-    // Upset detection
-    const odds = getOddsEntry(comp);
-    if (odds) {
-      const aFav = odds.awayTeamOdds?.favorite, hFav = odds.homeTeamOdds?.favorite;
-      if ((awayWon && hFav) || (!awayWon && aFav)) {
-        const underdogML = awayWon ? odds.awayTeamOdds?.moneyLine : odds.homeTeamOdds?.moneyLine;
-        upsets.push({ at, ht, awayWon, as_, hs, underdogML, lg, ev });
-      }
-    }
-
-    // Close game detection
-    const thresh = CLOSE[lg.sport] ?? 3;
-    if (margin <= thresh) closeGames.push({ at, ht, awayWon, as_, hs, lg, ev });
-  }
-
-  // Sort upsets by underdog ML (bigger underdog first)
-  upsets.sort((a,b) => (b.underdogML||0) - (a.underdogML||0));
-
-  // Fetch box scores for notable stats
-  const allStats = [];
-  await Promise.allSettled(completed.map(async ({ ev, lg }) => {
+  // Fetch all box scores in parallel; attach stats directly to each game object
+  const allGames = Object.values(byLeague).flatMap(b => b.games);
+  await Promise.allSettled(allGames.map(async game => {
     try {
+      const { ev, lg } = game;
       const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${lg.sport}/${lg.league}/summary?event=${ev.id}`);
       if (!r.ok) return;
       const d = await r.json();
-      for (const s of extractNotableStats(d, lg.sport)) {
-        const comp = ev.competitions?.[0];
-        const cs = comp?.competitors||[];
-        const opp = cs.find(c=>c.team?.displayName !== s.team);
-        allStats.push({ ...s, oppName: opp?.team?.displayName || '', lg, ev });
-      }
+      game.stats = extractNotableStats(d, lg.sport);
+      game.stats.sort((a,b) => (b.priority||0) - (a.priority||0));
     } catch {}
   }));
 
-  allStats.sort((a,b)=>(b.priority||0)-(a.priority||0));
-
   // Render
   main.innerHTML = '';
-  const wrap = document.createElement('div'); wrap.className = 'summary-wrap';
-
-  const hdr = document.createElement('div'); hdr.className = 'summary-hdr';
-  hdr.innerHTML = `<div class="summary-title">📋 Daily Recap</div><div class="summary-sub">${formatDisplayDate(currentDate)} · ${completed.length} completed game${completed.length!==1?'s':''}</div>`;
+  const wrap = document.createElement('div'); wrap.className = 'recap-wrap';
+  const hdr = document.createElement('div'); hdr.className = 'recap-hdr';
+  hdr.innerHTML = `<div class="recap-title">📋 Daily Recap</div><div class="recap-sub">${formatDisplayDate(currentDate)} · ${allGames.length} completed game${allGames.length!==1?'s':''}</div>`;
   wrap.appendChild(hdr);
 
-  function tag(lg) {
-    return `<span class="summary-tag" style="background:${lg.color}22;color:${lg.color}">${lg.label}</span>`;
-  }
+  // Render one card per league, in tab order
+  for (const lg of leagues) {
+    const bucket = byLeague[lg.id];
+    if (!bucket) continue;
+    const emoji = SPORT_EMOJI[lg.sport] || '🏆';
 
-  if (upsets.length) {
-    const items = upsets.map(({ at, ht, awayWon, as_, hs, underdogML, lg }) => {
-      const winner = awayWon ? at.displayName : ht.displayName;
-      const loser  = awayWon ? ht.displayName : at.displayName;
-      const mlStr  = underdogML ? ` · ${formatML(underdogML)} ML` : '';
-      return { icon:'🚨', html:`<strong>${winner}</strong> upset <strong>${loser}</strong> — ${as_}–${hs}${mlStr}${tag(lg)}` };
-    });
-    wrap.appendChild(mkRecapSection('Upsets', '#ef4444', items));
-  }
+    const card = document.createElement('div'); card.className = 'recap-league';
 
-  if (closeGames.length) {
-    const items = closeGames.map(({ at, ht, awayWon, as_, hs, lg, ev }) => {
-      const winner = awayWon ? at.displayName : ht.displayName;
-      const loser  = awayWon ? ht.displayName : at.displayName;
-      const detail = ev.status?.type?.shortDetail || '';
-      const suffix = /OT|OT\d/.test(detail) ? ' (OT)' : /SO/.test(detail) ? ' (SO)' : '';
-      return { icon:'⚡', html:`<strong>${winner}</strong> def. <strong>${loser}</strong> — ${as_}–${hs}${suffix}${tag(lg)}` };
-    });
-    wrap.appendChild(mkRecapSection('Close Games', '#3b82f6', items));
-  }
+    const lgHdr = document.createElement('div'); lgHdr.className = 'recap-league-hdr';
+    lgHdr.style.borderLeft = `3px solid ${lg.color}`;
+    lgHdr.innerHTML = `<span>${emoji} ${lg.label}</span><span class="recap-league-count">${bucket.games.length} game${bucket.games.length!==1?'s':''}</span>`;
+    card.appendChild(lgHdr);
 
-  if (allStats.length) {
-    const items = allStats.map(s => ({
-      icon: s.icon,
-      html: `<strong>${s.player}</strong> — ${s.desc}${s.oppName ? ` vs ${s.oppName}` : ''}${tag(s.lg)}`
-    }));
-    wrap.appendChild(mkRecapSection('Standout Performances', '#f59e0b', items));
-  }
+    for (const game of bucket.games) {
+      const { at, ht, aScore, hScore, awayWon, isUpset, upsetML, isClose, otSuffix, stats } = game;
+      const aName = at.shortDisplayName || at.displayName || at.abbreviation || 'AWY';
+      const hName = ht.shortDisplayName || ht.displayName || ht.abbreviation || 'HME';
 
-  if (!upsets.length && !closeGames.length && !allStats.length) {
-    const empty = document.createElement('div'); empty.className = 'state-box';
-    empty.innerHTML = '<p>No notable highlights today yet.</p>';
-    wrap.appendChild(empty);
+      const gameDiv = document.createElement('div'); gameDiv.className = 'recap-game';
+
+      // Score line
+      const sl = document.createElement('div'); sl.className = 'recap-scoreline';
+      sl.innerHTML =
+        `<span class="recap-team${awayWon?' w':''}">${aName}</span>` +
+        `<span class="recap-score-nums">${aScore}–${hScore}</span>` +
+        `<span class="recap-team${!awayWon?' w':''}">${hName}</span>`;
+
+      if (otSuffix) {
+        const b = document.createElement('span'); b.className = 'recap-badge ot'; b.textContent = otSuffix; sl.appendChild(b);
+      }
+      if (isUpset) {
+        const b = document.createElement('span'); b.className = 'recap-badge upset';
+        b.textContent = upsetML ? `UPSET ${formatML(upsetML)}` : 'UPSET'; sl.appendChild(b);
+      } else if (isClose && !otSuffix) {
+        const b = document.createElement('span'); b.className = 'recap-badge close'; b.textContent = 'CLOSE'; sl.appendChild(b);
+      }
+      gameDiv.appendChild(sl);
+
+      // Notable stat lines
+      if (stats.length) {
+        const sd = document.createElement('div'); sd.className = 'recap-stats';
+        stats.forEach(s => {
+          const line = document.createElement('div'); line.className = 'recap-stat';
+          line.textContent = `${s.icon} ${s.player} — ${s.desc}`;
+          sd.appendChild(line);
+        });
+        gameDiv.appendChild(sd);
+      }
+      card.appendChild(gameDiv);
+    }
+    wrap.appendChild(card);
   }
 
   main.appendChild(wrap);
