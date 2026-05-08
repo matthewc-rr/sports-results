@@ -849,6 +849,7 @@ async function loadOURecords(strip, awayTeam, homeTeam, lg) {
 function extractNotableStats(summary, sport) {
   const results = [];
   const players = summary?.boxscore?.players || [];
+  let top = null; // fallback: best performer even if nothing threshold-worthy
 
   if (sport === 'basketball') {
     for (const td of players) {
@@ -858,9 +859,11 @@ function extractNotableStats(summary, sport) {
       for (const ath of sg.athletes || []) {
         const pts = parseInt(ath.stats?.[pi]), reb = parseInt(ath.stats?.[ri]), ast = parseInt(ath.stats?.[ai]);
         const name = ath.athlete?.displayName, team = td.team?.displayName;
-        if (pts >= 50) results.push({ icon:'🔥', player:name, team, desc:`${pts} pts`, priority: pts });
-        else if (pts >= 40) results.push({ icon:'🏀🔥', player:name, team, desc:`${pts} pts`, priority: pts });
-        else if (pts >= 20 && reb >= 10 && ast >= 10) results.push({ icon:'🤯', player:name, team, desc:`triple-double (${pts}/${reb}/${ast})`, priority: pts+reb+ast });
+        if (!name || isNaN(pts)) continue;
+        if (pts >= 50) results.push({ icon:'🔥', player:name, team, desc:`${pts} pts`, priority:pts });
+        else if (pts >= 40) results.push({ icon:'🏀🔥', player:name, team, desc:`${pts} pts`, priority:pts });
+        else if (pts >= 20 && reb >= 10 && ast >= 10) results.push({ icon:'🤯', player:name, team, desc:`triple-double (${pts}/${reb}/${ast})`, priority:pts+reb+ast });
+        if (!top || pts > top.val) top = { icon:'🏀', player:name, team, desc:`${pts} pts${!isNaN(reb)&&reb>0?`, ${reb} reb`:''}${!isNaN(ast)&&ast>0?`, ${ast} ast`:''}`, val:pts, priority:0 };
       }
     }
   } else if (sport === 'hockey') {
@@ -871,20 +874,37 @@ function extractNotableStats(summary, sport) {
       for (const ath of sg.athletes || []) {
         const g = parseInt(ath.stats?.[gi]), a = parseInt(ath.stats?.[ai]);
         const name = ath.athlete?.displayName, team = td.team?.displayName;
-        if (g >= 3) results.push({ icon:'🎩🔥', player:name, team, desc:`hat trick (${g}G${!isNaN(a)&&a>0?`, ${a}A`:''})`, priority: 100+g });
-        else if (!isNaN(g)&&!isNaN(a)&&g+a>=4) results.push({ icon:'⭐', player:name, team, desc:`${g}G, ${a}A`, priority: g+a });
+        if (!name) continue;
+        const pts = (isNaN(g)?0:g) + (isNaN(a)?0:a);
+        if (g >= 3) results.push({ icon:'🎩🔥', player:name, team, desc:`hat trick (${g}G${!isNaN(a)&&a>0?`, ${a}A`:''})`, priority:100+g });
+        else if (pts >= 4) results.push({ icon:'⭐', player:name, team, desc:`${g}G, ${a}A`, priority:pts });
+        if (pts > 0 && (!top || pts > top.val)) {
+          const desc = g > 0 && a > 0 ? `${g}G, ${a}A` : g > 0 ? `${g}G` : `${a}A`;
+          top = { icon:'🏒', player:name, team, desc, val:pts, priority:0 };
+        }
       }
     }
   } else if (sport === 'baseball') {
     for (const td of players) {
       for (const sg of td.statistics || []) {
         const nm = sg.names || [];
-        const hri = nm.indexOf('HR'), rbii = nm.indexOf('RBI');
-        if (hri < 0) continue;
+        const hri = nm.indexOf('HR'), rbii = nm.indexOf('RBI'), hi = nm.indexOf('H'), abi = nm.indexOf('AB');
         for (const ath of sg.athletes || []) {
           const hr = parseInt(ath.stats?.[hri]), rbi = parseInt(ath.stats?.[rbii]);
-          if (hr >= 3) results.push({ icon:'🔥', player:ath.athlete?.displayName, team:td.team?.displayName, desc:`${hr} HR${!isNaN(rbi)?`, ${rbi} RBI`:''}`, priority: hr*10 });
-          else if (hr >= 2) results.push({ icon:'💥', player:ath.athlete?.displayName, team:td.team?.displayName, desc:`${hr} HR${!isNaN(rbi)?`, ${rbi} RBI`:''}`, priority: hr*10 });
+          const h = parseInt(ath.stats?.[hi]), ab = parseInt(ath.stats?.[abi]);
+          const name = ath.athlete?.displayName, team = td.team?.displayName;
+          if (!name) continue;
+          if (hr >= 3) results.push({ icon:'🔥', player:name, team, desc:`${hr} HR${!isNaN(rbi)?`, ${rbi} RBI`:''}`, priority:hr*10 });
+          else if (hr >= 2) results.push({ icon:'💥', player:name, team, desc:`${hr} HR${!isNaN(rbi)?`, ${rbi} RBI`:''}`, priority:hr*10 });
+          // fallback: player with most RBI or most hits
+          const score = (!isNaN(rbi)?rbi*2:0) + (!isNaN(hr)?hr*3:0) + (!isNaN(h)?h:0);
+          if (score > 0 && (!top || score > top.val)) {
+            const parts = [];
+            if (!isNaN(h) && !isNaN(ab) && h > 0) parts.push(`${h}-for-${ab}`);
+            if (!isNaN(hr) && hr > 0) parts.push(`${hr} HR`);
+            if (!isNaN(rbi) && rbi > 0) parts.push(`${rbi} RBI`);
+            if (parts.length) top = { icon:'⚾', player:name, team, desc:parts.join(', '), val:score, priority:0 };
+          }
         }
       }
     }
@@ -892,14 +912,24 @@ function extractNotableStats(summary, sport) {
     for (const td of players) {
       const sg = td.statistics?.[0]; if (!sg) continue;
       const nm = sg.names || [];
-      const gi = nm.indexOf('G');
+      const gi = nm.indexOf('G'), ai2 = nm.indexOf('A');
       if (gi < 0) continue;
       for (const ath of sg.athletes || []) {
-        const g = parseInt(ath.stats?.[gi]);
-        if (g >= 2) results.push({ icon:'⚽🔥', player:ath.athlete?.displayName, team:td.team?.displayName, desc:`${g} goals`, priority: g*10 });
+        const g = parseInt(ath.stats?.[gi]), a = parseInt(ath.stats?.[ai2]);
+        const name = ath.athlete?.displayName, team = td.team?.displayName;
+        if (!name) continue;
+        if (g >= 2) results.push({ icon:'⚽🔥', player:name, team, desc:`${g} goals`, priority:g*10 });
+        const pts = (isNaN(g)?0:g) + (isNaN(a)?0:a);
+        if (pts > 0 && (!top || pts > top.val)) {
+          const desc = g > 0 && !isNaN(a) && a > 0 ? `${g}G, ${a}A` : g > 0 ? `${g} goal${g>1?'s':''}` : `${a} assist${a>1?'s':''}`;
+          top = { icon:'⚽', player:name, team, desc, val:pts, priority:0 };
+        }
       }
     }
   }
+
+  // If nothing notable happened, fall back to showing the game's top performer
+  if (results.length === 0 && top) results.push(top);
   return results;
 }
 
